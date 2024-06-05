@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface de Gestion Bancaire</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+</head>
+<body>
+
+<div class="container">
+    <h2>Connexion</h2>
+    <div class="row">
+        <form id="loginForm" class="col s12">
+            <div class="row">
+                <div class="input-field col s12">
+                    <input id="username" type="text" class="validate" required>
+                    <label for="username">Nom d'utilisateur</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="input-field col s12">
+                    <input id="password" type="password" class="validate" required>
+                    <label for="password">Mot de passe</label>
+                </div>
+            </div>
+            <div class="row">
+                <button class="waves-effect waves-light btn" type="submit">Se connecter</button>
+            </div>
+            <div class="row">
+                <p>Vous n'avez pas de compte ? <a href="#modal-signup" class="modal-trigger">Inscrivez-vous</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Fenêtre modale d'inscription -->
+<div id="modal-signup" class="modal">
+    <div class="modal-content">
+        <h4>Inscription</h4>
+        <!-- Formulaire d'inscription avec les champs supplémentaires -->
+        <div class="row">
+            <form id="signupForm" class="col s12">
+                <div class="row">
+                    <div class="input-field col s6">
+                        <input id="firstName" type="text" class="validate" required>
+                        <label for="firstName">Prénom</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input id="lastName" type="text" class="validate" required>
+                        <label for="lastName">Nom</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input id="email" type="email" class="validate" required>
+                        <label for="email">Adresse e-mail</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input id="newPassword" type="password" class="validate" required>
+                        <label for="newPassword">Mot de passe</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input id="confirmPassword" type="password" class="validate" required>
+                        <label for="confirmPassword">Confirmez le mot de passe</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <button class="waves-effect waves-light btn" type="submit">S'inscrire</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+    $(document).ready(function(){
+        // Initialisation de la fenêtre modale
+        $('.modal').modal();
+
+        // Configuration de l'URL de votre API
+        const apiUrl = 'http://127.0.0.1:3000/api';
+
+        // Gestion de la soumission du formulaire de connexion
+        $('#loginForm').submit(function(event){
+            event.preventDefault(); // Empêche la soumission du formulaire par défaut
+
+            // Récupération des valeurs du formulaire
+            const username = $('#username').val();
+            const password = $('#password').val();
+
+            // Envoi des données au serveur via une requête AJAX
+            $.ajax({
+                url: `/login`,
+                type: 'POST',
+                contentType: 'application/json',
+                headers: {
+                'Content-Type': 'application/json' // Specify content type
+            },
+                data: JSON.stringify({ username: username, password: password }),
+                success: function(response){
+                            // Redirige l'utilisateur vers la page de gestion bancaire s'il est authentifié
+                // Utilisez window.location.href pour rediriger l'utilisateur vers la page bank_management.html
+                if (response) {
+                    localStorage.setItem("token", response.token );
+                    window.location.href = 'index.html';
+                }
+                
+
+
+                    //alert('Bienvenue'); // Affiche un message de bienvenue si la connexion réussit
+                    // Redirige l'utilisateur vers la page des transactions
+                    //window.location.href = 'transactions.html';
+                },
+                error: function(xhr, status, error){
+                    alert('Problème de connexion'); // Affiche un message d'erreur en cas de problème de connexion
+                }
+            });
+        });
+
+        // Gestion de la soumission du formulaire d'inscription
+        $('#signupForm').submit(function(event){
+            event.preventDefault(); // Empêche la soumission du formulaire par défaut
+
+            // Récupération des valeurs du formulaire d'inscription
+            const firstName = $('#firstName').val();
+            const lastName = $('#lastName').val();
+            const email = $('#email').val();
+            const newPassword = $('#newPassword').val();
+            const confirmPassword = $('#confirmPassword').val();
+
+            // Vérification que les mots de passe correspondent
+            if (newPassword !== confirmPassword) {
+                alert('Les mots de passe ne correspondent pas.');
+                return;
+            }
+
+            // Envoi des données au serveur via une requête AJAX
+            $.ajax({
+                url: `${apiUrl}/signup`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ 
+                    firstName: firstName, 
+                    lastName: lastName,
+                    email: email,
+                    password: newPassword 
+                }),
+                success: function(response){
+                    alert('Compte créé avec succès'); // Affiche un message de succès si l'inscription réussit
+                    // Ferme la fenêtre modale d'inscription
+                    $('#modal-signup').modal('close');
+                },
+                error: function(xhr, status, error){
+                    alert('Erreur lors de l\'inscription'); // Affiche un message d'erreur en cas d'échec de l'inscription
+                }
+            });
+        });
+    });
+</script>
+
+</body>
+</html>

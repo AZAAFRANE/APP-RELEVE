@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface de Gestion Bancaire</title>
+    
+</head>
+<body>
+
+    <h1>Gestion Bancaire</h1>
+    <input type="file" id="csvFile" name="csvFile" accept=".csv" style="margin-top: 10px;">
+    <button onclick="uploadCSV()">Charger un nouveau CSV</button>
+    <button onclick="loadData()">Rafraîchir les transactions</button>
+    <button  id="logoutButton" onclick="logOut()">Se déconnecter</button>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h2>Aperçu du fichier</h2>
+            <iframe id="pdfPreview" style="width:100%; height: 400px;"></iframe>
+            <button id='btn-validate' onclick="uploadFile()">VALIDER</button>
+            <button id='btn-delete' onclick="deleteAction()">SUPPRIMER</button>
+            <button onclick="printAction()">IMPRIMER</button>
+            <button onclick="downloadAction()">TELECHARGER</button>
+            <button onclick="closeModal()">Fermer</button>
+        </div>
+    </div>
+
+    <div id="transactions">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Débit (€)</th>
+                    <th>Crédit (€)</th>
+                    <th>Montant en TND</th>
+                    <th>Solde (€)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <div id="navigationButtons">
+        <button id="prevButton">&lt;</button>
+        <button id="nextButton">&gt;</button>
+    </div>
+
+    <script>
+        function logOut(){
+            localStorage.removeItem('token');
+            window.location.href = 'login.html';
+
+        }
+
+
+
+        function loadData() {
+            const token = localStorage.getItem('token');
+            if (token) {
+
+            }
+            fetch('/api/transactions',{
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }})
+            .then(response => response.json())
+            .then(data => updateTransactionsTable(data))
+            .catch(error => console.error('Error loading the transactions:', error));
+        }
+
+        function uploadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Veuillez sélectionner un fichier CSV.");
+                return;
+            }
+            const formData = new FormData();
+            formData.append('csvfile', file);
+
+            fetch('/api/upload/csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Problème lors de l\'upload du fichier CSV');
+                }
+                return response.text();
+            })
+            .then(() => loadData())  // Recharge les données après l'upload
+            .catch(error => console.error('Error uploading the CSV file:', error));
+        }
+
+        function updateTransactionsTable(data) {
+            const transactionsTable = document.querySelector("#transactions table tbody");
+            transactionsTable.innerHTML = '';
+            data.forEach(transaction => {
+                //const path = transaction.file_path? transaction.file
+                const newRow = transactionsTable.insertRow();
+                if (transaction.etat == 'done') {
+                    newRow.setAttribute("data-status", "processed");
+                }
+                // else {
+                //     newRow.setAttribute("data-status", "in_progress");
+                // }
+                newRow.insertCell(0).textContent = transaction.date;
+                newRow.insertCell(1).textContent = transaction.description;
+                newRow.insertCell(2).textContent = formatNumber(transaction.debit);
+                newRow.insertCell(3).textContent = formatNumber(transaction.credit);
+                newRow.insertCell(4).innerHTML = `<input type='text' value='${formatNumberTnd(transaction.montant_tnd)}' placeholder='Montant en TND' onchange='UpdateMontantTnd(this, ${transaction.id})'>`;
+                newRow.insertCell(5).textContent = formatNumber(transaction.solde);
+                /*const actionsCell = newRow.insertCell(6);
+                actionsCell.innerHTML = `<label class='file-label'>+<input type='file' name='file' id='file-${transaction.id}' class='file-input' accept='.pdf' onchange='previewFile(this,${transaction.id})'></label><input value='${transaction.commentaire? transaction.commentaire: ''}' onchange='UpdateCommentaire(this, ${transaction.id})' type='text' placeholder='Commentaire'><button onclick='confirmRemoval(this)'>🗑️</button>`;
+
+                    const visualCell = newRow.insertCell(7);
+                 visualCell.innerHTML = `<button onclick="visualise(this, '${transaction.file_path}')">Voir</button>`;
+                
+*/
+                var input_file = !transaction.file_path?  `<label class='file-label'>+<input type='file' name='file' id='file-${transaction.id}' class='file-input' accept='.pdf' onchange='previewFile(this,${transaction.id})'/></label>`: ``
+                var button_path = transaction.file_path? `<button onclick="visualise(this, ${transaction.id}, '${transaction.file_path}')">👁️</button>` : ``
+                 const actionsCell = newRow.insertCell(6);
+                 actionsCell.innerHTML = `
+                 ${input_file}
+                 <input value='${transaction.commentaire? transaction.commentaire: ''}' onchange='UpdateCommentaire(this, ${transaction.id})' type='text' placeholder='Commentaire'/>
+                        ${button_path}
+                <div class="radio-container">
+                    <input type="radio" id="traité-${transaction.id}" name="status-${transaction.id}" value="traité" onchange="setStatus(${transaction.id}, 'done')">
+                    <label for="traité-${transaction.id}">Traitée</label>
+                </div>
+                <div class="radio-container">
+                    <input type="radio" id="en_cours-${transaction.id}" name="status-${transaction.id}" value="en_cours" onchange="setStatus(${transaction.id}, 'in_progress')">
+                    <label for="en_cours-${transaction.id}">En cours</label>
+                </div>
+                <button onclick="confirmRemoval(this, ${transaction.id}, '${transaction.file_path}')">🗑️</button>
+                 `
+
+                
+
+                       // <td><button onclick="openModal(${transaction.id}})">Prévisualiser</button></td>
+       // <td><button onclick="uploadFile(${transaction.id}})">Télécharger</button></td>
+    ;
+            
+            });
+        }
+        function setStatus(id, state) {
+            
+            if (confirm("Êtes-vous sûr de vouloir changer l'état ?")) {
+            fetch(`/api/update/state/${id}`, {
+            method: 'PUT',
+            headers: {
+            'Content-Type': 'application/json' // Specify content type
+            },
+            body: JSON.stringify({state : state})
+            }).then(response => {
+                    if (!response.ok) {
+                        throw new Error('Probleme');
+                    }
+
+                    alert(`Etat mis à jours : ${state}`) ;
+                })
+
+            }
+        }
+
+
+        function formatNumber(value) {
+            return value ? parseFloat(value).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }) : '';
+        }
+        function formatNumberTnd(value) {
+            return value ? parseFloat(value).toLocaleString('fr-FR', { style: 'currency', currency: 'TND', minimumFractionDigits: 2 }) : '';
+        }
+
+        function reverseFormatNumber(formattedValue) {
+    // Replace commas with dots if they are not followed by another digit
+    const numericString = formattedValue.replace(/(?<=\d),(?=\d+)/g, '.');
+
+    // Remove non-numeric characters
+    const sanitizedString = numericString.replace(/[^\d.-]/g, '');
+
+    // Parse the numeric string to float
+    const floatValue = parseFloat(sanitizedString);
+
+    return isNaN(floatValue) ? 0 : floatValue; // Return 0 if parsing fails
+        }
+
+        function UpdateMontantTnd(value, id) {
+            console.log(reverseFormatNumber(value.value))
+            body = {amount : reverseFormatNumber(value.value)}
+            fetch(`/api/updatetnd/${id}`, {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json' // Specify content type
+            },
+            body: JSON.stringify(body)
+            }).then(response => {
+                    if (!response.ok) {
+                        throw new Error('Probleme');
+                    }
+                    return response.text();
+                })
+
+        }
+
+        function UpdateCommentaire(value, id) {
+            body = {commentaire : value.value}
+            fetch(`/api/updatecom/${id}`, {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json' // Specify content type
+            },
+            body: JSON.stringify(body)
+            }).then(response => {
+                    if (!response.ok) {
+                        throw new Error('Probleme');
+                    }
+                    return response.text();
+                })
+
+        }
+
+
+
+        function openModal(rowIndex) {
+            const fileInput = document.getElementById(`fileInput-${rowIndex}`);
+            localStorage.setItem("transId", rowIndex );
+            const file = fileInput.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                document.getElementById('pdfPreview').src = url;
+                document.getElementById('modal').classList.add('show');
+            } else {
+                alert('Veuillez sélectionner un fichier.');
+            }
+        }
+        function visualise(button,id,path){
+            const currentURL = window.location.href
+            localStorage.setItem("transId", id);
+            localStorage.setItem('file_path', path)
+            const newPath = currentURL.substring(0, currentURL.lastIndexOf('/public'));
+            console.log('path', newPath+'/'+path)
+                document.getElementById('pdfPreview').src = newPath+'/'+path
+                document.getElementById('btn-validate').classList.add('hide')
+                document.getElementById('modal').classList.add('show');
+
+        }
+
+        function previewFile(input,rowIndex) {
+            //const fileInput = document.getElementById(`fileInput-${rowIndex}`);
+            //console.log(fileInput)
+            document.getElementById('btn-delete').classList.add('hide')
+            localStorage.setItem("transId", rowIndex );
+            const file = input.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileURL = URL.createObjectURL(file);
+                document.getElementById('pdfPreview').src = fileURL;
+                document.getElementById('modal').classList.add('show');
+            } else {
+                alert('Veuillez sélectionner un fichier PDF.');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+            URL.revokeObjectURL(document.getElementById('pdfPreview').src); 
+        }
+
+        function uploadFile() {
+            var rowIndex = localStorage.getItem("transId");
+            console.log(rowIndex)
+    const fileInput = document.getElementById(`file-${rowIndex}`);
+    console.log(rowIndex, fileInput)
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('transId', rowIndex)
+
+    fetch(`/api/upload/pdf/${rowIndex}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('File uploaded successfully:', data.path);
+        closeModal();
+    })
+    .catch(error => {
+        console.error('Error uploading file:', error);
+        alert('Erreur lors du téléchargement');
+    });
+}
+
+
+        function validateAction() {
+            console.log('Action VALIDER');
+            closeModal();
+        }
+
+        function deleteAction() {
+            var id = localStorage.getItem("transId");
+            var file_path = localStorage.getItem("file_path");
+            if (confirm("Êtes-vous sûr de vouloir supprimer ce fichier ?")) {
+                var body = {file_path : file_path}
+                    fetch(`/api/delete/pdf/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                        'Content-Type': 'application/json' // Specify content type
+                        },
+                        body: JSON.stringify(body)
+                        }).then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Probleme');
+                                }
+                                console.log('Action SUPPRIMER');
+                                closeModal();
+                    })               
+            }
+
+
+
+            
+        }
+
+        function printAction() {
+            var iframe = document.getElementById('pdfPreview');
+            iframe.focus();
+
+            if (iframe.contentWindow) {
+                iframe.contentWindow.print();
+            } else if (iframe.contentDocument) {
+                if (iframe.contentDocument.document) iframe.contentDocument.document.execCommand('print', false, null);
+                else iframe.contentDocument.execCommand('print', false, null);
+            }
+        }
+
+        function downloadAction() {
+            const url = document.getElementById('pdfPreview').src;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'fichier.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function confirmRemoval(button, id, file_path) {
+            if (confirm("Êtes-vous sûr de vouloir supprimer cette transaction ?")) {
+                var body = {file_path : file_path}
+                    fetch(`/api/delete/trans/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                        'Content-Type': 'application/json' // Specify content type
+                        },
+                        body: JSON.stringify(body)
+                        }).then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Probleme');
+                                }
+                                removeRow(button);
+                    })               
+            }
+        }
+
+        function removeRow(button) {
+            button.closest('tr').remove();
+        }
+
+        window.onload = loadData;
+    </script>
+
+</body>
+</html>
